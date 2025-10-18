@@ -1435,3 +1435,5 @@ document.addEventListener('DOMContentLoaded', function () {
 
     init();
 });
+" in the canvas, and I'm asking a question about it. Please fix the error.
+
