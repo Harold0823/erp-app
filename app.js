@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', function () {
     // --- API & GLOBAL STATE ---
     // Direct URL for local development. This should be changed for production.
-    const API_URL = 'http://localhost:5000'; 
+const API_URL = 'http://localhost:5000/api';'; 
     let currentUser = null;
     let users = [];
     let inventory = [];
@@ -1436,4 +1436,5 @@ document.addEventListener('DOMContentLoaded', function () {
     init();
 });
 " in the canvas, and I'm asking a question about it. Please fix the error.
+
 
