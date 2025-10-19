@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', function () {
     // --- API & GLOBAL STATE ---
-    // Direct URL for local development. This should be changed for production.
-const API_URL = ' https://harold0823.github.io/erp-app/api';
+    // IMPORTANT: Replace this with your actual Render backend URL
+    const API_URL = 'https://quantum-erp-api.onrender.com/api'; 
     let currentUser = null;
     let users = [];
     let inventory = [];
@@ -77,7 +77,6 @@ const API_URL = ' https://harold0823.github.io/erp-app/api';
             activePage.classList.add('active');
             pageTitle.textContent = document.querySelector(`.nav-link[data-page="${pageId}"]`).textContent.trim();
             
-            // Special handling for pages that need initialization
             if (pageId === 'live-location') {
                 if (!map) initMap();
                 renderAllActivePins();
@@ -161,7 +160,6 @@ const API_URL = ' https://harold0823.github.io/erp-app/api';
         `;
         weeklySalesContainer.innerHTML = weeklyChartHTML;
     }
-
 
     function renderSellersOverview() {
         const today = new Date().toISOString().split('T')[0];
@@ -338,7 +336,6 @@ const API_URL = ' https://harold0823.github.io/erp-app/api';
         attendanceContainer.innerHTML = attendanceChartHTML
     }
 
-    // --- DEPLOYMENT CHARTS ---
     function renderDeploymentCharts() {
         const today = new Date();
         const todayStr = today.toISOString().split('T')[0];
@@ -404,11 +401,64 @@ const API_URL = ' https://harold0823.github.io/erp-app/api';
     }
 
     // --- CRUD OPERATIONS & API CALLS ---
-
     async function apiCall(endpoint, method = 'GET', body = null) {
-        // This is a mock API call function. It does not actually make a network request.
-        console.log(`Mock API Call: ${method} ${endpoint}`);
-        return new Promise(resolve => setTimeout(() => resolve(null), 200));
+        try {
+            const token = localStorage.getItem('authToken');
+            const options = {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            };
+
+            if (token) {
+                options.headers['Authorization'] = `Bearer ${token}`;
+            }
+
+            if (body) {
+                options.body = JSON.stringify(body);
+            }
+
+            const response = await fetch(`${API_URL}${endpoint}`, options);
+
+            if (response.status === 401) {
+                console.error("Authentication error. Logging out.");
+                handleLogout();
+                return null;
+            }
+            
+            const contentType = response.headers.get("content-type");
+
+            if (!response.ok) {
+                 if (contentType && contentType.includes("application/json")) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || `API Error: ${response.status}`);
+                } else {
+                    const errorText = await response.text();
+                    console.error("Non-JSON error response from server:", errorText);
+                    throw new Error(`Login failed. The server sent an unexpected response.`);
+                }
+            }
+            
+            if (method === 'DELETE' || response.status === 204) {
+                return;
+            }
+
+            if (!contentType || !contentType.includes("application/json")) {
+                 console.error("Server did not return JSON. Response:", await response.text());
+                 throw new Error("Received an invalid response format from the server.");
+            }
+
+            return response.json();
+
+        } catch (error) {
+            console.error(`Failed to ${method} ${endpoint}`, error);
+            const loginError = document.getElementById('login-error');
+            if (loginError) {
+                loginError.textContent = error.message;
+            }
+            return null;
+        }
     }
     
     // Users
@@ -427,9 +477,8 @@ const API_URL = ' https://harold0823.github.io/erp-app/api';
 
     window.deleteUser = async function(id) {
         if (confirm('Are you sure you want to delete this user?')) {
-            // Mock delete
-            users = users.filter(u => u._id !== id);
-            renderAll();
+            await apiCall(`/users/${id}`, 'DELETE');
+            await fetchAllData();
         }
     };
 
@@ -490,8 +539,8 @@ const API_URL = ' https://harold0823.github.io/erp-app/api';
 
     window.deleteInventory = async function(id) {
         if (confirm('Are you sure you want to delete this item?')) {
-            inventory = inventory.filter(i => i._id !== id);
-            renderAll();
+            await apiCall(`/inventory/${id}`, 'DELETE');
+            await fetchAllData();
         }
     };
 
@@ -534,8 +583,8 @@ const API_URL = ' https://harold0823.github.io/erp-app/api';
 
     window.deleteOrder = async function(id) {
         if (confirm('Are you sure you want to delete this order?')) {
-            orders = orders.filter(o => o._id !== id);
-            renderAll();
+            await apiCall(`/orders/${id}`, 'DELETE');
+            await fetchAllData();
         }
     };
     
@@ -615,8 +664,8 @@ const API_URL = ' https://harold0823.github.io/erp-app/api';
 
     window.deleteProject = async function(id) {
         if (confirm('Are you sure you want to delete this project?')) {
-            projects = projects.filter(p => p._id !== id);
-            renderAll();
+            await apiCall(`/projects/${id}`, 'DELETE');
+            await fetchAllData();
         }
     };
 
@@ -847,9 +896,8 @@ const API_URL = ' https://harold0823.github.io/erp-app/api';
                 address: address
             };
             
-            // --- MOCK CHANGE ---
-            timeClockLogs.push(logEntry);
-            renderAll(); // Re-render everything to show the new log
+            await apiCall('/time-clock-logs', 'POST', logEntry);
+            await fetchAllData();
             
             updateClockUI(selfieData.action);
 
@@ -1082,58 +1130,6 @@ const API_URL = ' https://harold0823.github.io/erp-app/api';
     }
 
     // --- EVENT LISTENERS ---
-    // Login
-    // Replace the mock login event listener with this:
-document.getElementById('login-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
-    const loginError = document.getElementById('login-error');
-    loginError.textContent = '';
-
-    try {
-        const data = await apiCall('/auth/login', 'POST', { email, password });
-
-        if (!data || !data.user || !data.token) {
-            // This will trigger if the apiCall function returns null or an invalid response
-            if (!loginError.textContent) {
-                loginError.textContent = "Login failed. Please check your credentials.";
-            }
-            return;
-        }
-
-        const { user, token } = data;
-
-        currentUser = user;
-        localStorage.setItem('authToken', token);
-
-        document.getElementById('currentUserDisplay').innerHTML = `
-            <p class="mb-1 text-white small"><b>${currentUser.name}</b></p>
-            <p class="mb-2 text-white-50 small">${currentUser.role}</p>
-        `;
-
-        updateUIForRole(currentUser.role);
-        await fetchAllData();
-
-        const defaultPage = (currentUser.role === 'Employee') ? 'time-clock' : 'dashboard';
-        showPage(defaultPage);
-        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-        document.querySelector(`.nav-link[data-page="${defaultPage}"]`).classList.add('active');
-    } catch (error) {
-        loginError.textContent = error.message;
-    }
-});
-    
-    function handleLogout() {
-        currentUser = null;
-        localStorage.removeItem('authToken');
-        stopLiveLocationSharing();
-        showPage(null); 
-        document.getElementById('login-form').reset();
-        document.getElementById('login-error').textContent = '';
-    }
-
-    document.getElementById('logoutBtn').addEventListener('click', handleLogout);
     
     // User form
     document.getElementById('saveUserBtn').addEventListener('click', async () => {
@@ -1152,16 +1148,15 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
         }
         
         if (id) {
-            users = users.map(u => u._id === id ? {...u, ...user} : u);
+            await apiCall(`/users/${id}`, 'PUT', user);
         } else {
             if(!password) {
                 alert('Password is required for new users.');
                 return;
             }
-            user._id = `user${Date.now()}`;
-            users.push(user);
+            await apiCall(`/users`, 'POST', user);
         }
-        renderAll();
+        await fetchAllData();
         userModal.hide();
     });
     
@@ -1177,12 +1172,11 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
         };
 
         if(id) {
-            inventory = inventory.map(i => i._id === id ? {...i, ...item} : i);
+            await apiCall(`/inventory/${id}`, 'PUT', item);
         } else {
-            item._id = `item${Date.now()}`;
-            inventory.push(item);
+            await apiCall('/inventory', 'POST', item);
         }
-        renderAll();
+        await fetchAllData();
         inventoryModal.hide();
     });
     
@@ -1250,12 +1244,11 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
         };
         
         if(id) {
-             orders = orders.map(o => o._id === id ? {...o, ...order} : o);
+             await apiCall(`/orders/${id}`, 'PUT', order);
         } else {
-            order._id = `order${Date.now()}`;
-            orders.push(order);
+            await apiCall('/orders', 'POST', order);
         }
-        renderAll();
+        await fetchAllData();
         orderModal.hide();
     });
 
@@ -1276,13 +1269,12 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
         if(id) {
             const existingProject = projects.find(p => p._id == id);
             project.assignedEmployees = existingProject.assignedEmployees;
-            projects = projects.map(p => p._id === id ? {...p, ...project} : p);
+            await apiCall(`/projects/${id}`, 'PUT', project);
         } else {
-            project._id = `proj${Date.now()}`;
             project.assignedEmployees = [];
-            projects.push(project);
+            await apiCall('/projects', 'POST', project);
         }
-        renderAll();
+        await fetchAllData();
         projectModal.hide();
     });
 
@@ -1294,7 +1286,8 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
              selectedEmployees.push(checkbox.value);
          });
         project.assignedEmployees = selectedEmployees;
-        renderAll();
+        await apiCall(`/projects/${projectId}`, 'PUT', { assignedEmployees: selectedEmployees });
+        await fetchAllData();
         assignEmployeeModal.hide();
     });
     
@@ -1361,107 +1354,71 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
     document.getElementById('selfie-modal').addEventListener('hidden.bs.modal', stopCamera);
     
     // --- INITIALIZATION ---
-    function loadMockData() {
-        console.log("Loading mock data.");
+    async function fetchAllData() {
+        const [usersData, inventoryData, ordersData, projectsData, logsData, salesData] = await Promise.all([
+            apiCall('/users'),
+            apiCall('/inventory'),
+            apiCall('/orders'),
+            apiCall('/projects'),
+            apiCall('/time-clock-logs'),
+            apiCall('/sales-reports'),
+        ]);
+        users = usersData || [];
+        inventory = inventoryData || [];
+        orders = ordersData || [];
+        projects = projectsData || [];
+        timeClockLogs = logsData || [];
+        salesReports = salesData || [];
     
-        users = [
-            { _id: 'mockuser123', name: 'Admin User', email: 'admin@test.com', role: 'Admin', status: 'Active', ratePerDay: 200 },
-            { _id: 'user2', name: 'Manager Mike', email: 'manager@test.com', role: 'Manager', status: 'Active', ratePerDay: 150 },
-            { _id: 'user3', name: 'Employee Emma', email: 'employee@test.com', role: 'Employee', status: 'Active', ratePerDay: 100 },
-            { _id: 'user4', name: 'Inactive Ian', email: 'ian@test.com', role: 'Employee', status: 'Inactive', ratePerDay: 100 }
-        ];
-    
-        inventory = [
-            { _id: 'item1', name: 'Quantum Widget', category: 'Widgets', stock: 150, price: 19.99, supplier: 'Quantum Supplies' },
-            { _id: 'item2', name: 'Flux Capacitor', category: 'Time Travel', stock: 5, price: 1299.99, supplier: 'Doc Brown Ent.' },
-            { _id: 'item3', name: 'LED Screws', category: 'Hardware', stock: 8, price: 1.50, supplier: 'Bright Stuff Inc.' },
-            { _id: 'item4', name: 'Carbon Nanotubes', category: 'Materials', stock: 500, price: 45.00, supplier: 'Future Fibers' }
-        ];
-    
-        orders = [
-            { _id: 'order1', customer: 'John Doe', items: [{ itemId: 'item1', quantity: 2 }], total: 39.98, date: new Date().toISOString(), status: 'Delivered' },
-            { _id: 'order2', customer: 'Jane Smith', items: [{ itemId: 'item2', quantity: 1 }, { itemId: 'item3', quantity: 10 }], total: 1314.99, date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), status: 'Shipped' }
-        ];
-        
-        projects = [
-            { _id: 'proj1', name: 'Website Redesign', description: 'Complete overhaul of the company website.', startDate: '2025-10-01', endDate: '2025-12-15', status: 'In Progress', tasks: ['Design mockups', 'Develop frontend', 'Deploy to server'], assignedEmployees: ['user3'] },
-            { _id: 'proj2', name: 'Q4 Marketing Campaign', description: 'Launch new marketing campaign for widgets.', startDate: '2025-10-15', endDate: '2025-11-30', status: 'Not Started', tasks: [], assignedEmployees: [] }
-        ];
-    
-        const today = new Date();
-        const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
-        timeClockLogs = [
-            { _id: 'log1', userId: 'user3', userName: 'Employee Emma', action: 'clock-in', timestamp: yesterday.toISOString(), photo: 'https://placehold.co/100x100/EEE/31343C?text=Selfie', location: { lat: 14.6760, lng: 121.0437 }, address: 'Quezon City Hall, Quezon City' },
-            { _id: 'log2', userId: 'user3', userName: 'Employee Emma', action: 'clock-out', timestamp: new Date(yesterday.getTime() + 8 * 60 * 60 * 1000).toISOString(), photo: 'https://placehold.co/100x100/EEE/31343C?text=Selfie', location: { lat: 14.6760, lng: 121.0437 }, address: 'Quezon City Hall, Quezon City' },
-            { _id: 'log3', userId: 'user3', userName: 'Employee Emma', action: 'clock-in', timestamp: today.toISOString(), photo: 'https://placehold.co/100x100/EEE/31343C?text=Selfie', location: { lat: 14.6091, lng: 121.0223 }, address: 'Makati City Hall, Makati' }
-        ];
-    
-        salesReports = [
-            { _id: 'sr1', userId: 'user3', date: yesterday.toISOString().split('T')[0], itemName: 'Quantum Widget', beginning: 100, remaining: 80, sold: 20 }
-        ];
+        renderAll();
     }
 
-    // Replace the mock fetchAllData function with this:
-async function fetchAllData() {
-    const [usersData, inventoryData, ordersData, projectsData, logsData, salesData] = await Promise.all([
-        apiCall('/users'),
-        apiCall('/inventory'),
-        apiCall('/orders'),
-        apiCall('/projects'),
-        apiCall('/time-clock-logs'),
-        apiCall('/sales-reports'),
-    ]);
-    users = usersData || [];
-    inventory = inventoryData || [];
-    orders = ordersData || [];
-    projects = projectsData || [];
-    timeClockLogs = logsData || [];
-    salesReports = salesData || [];
+    function renderAll() {
+        if (!currentUser) return; // Don't render if not logged in
+        updateDashboard();
+        renderUserTable();
+        renderInventoryTable();
+        renderOrderTable();
+        renderEmployeeProfiles();
+        renderProjectTable();
+        renderUserActivityLog();
+        renderAdminActivityLog();
+        renderSalesReportsTable();
+    }
 
-    renderAll();
-}    function renderAll() {
-    if (!currentUser) return; // Don't render if not logged in
-    updateDashboard();
-    renderUserTable();
-    renderInventoryTable();
-    renderOrderTable();
-    renderEmployeeProfiles();
-    renderProjectTable();
-    renderUserActivityLog();
-    renderAdminActivityLog();
-    renderSalesReportsTable();
-}
-
-    function init() {
-        // --- MOCK AUTO-LOGIN ---
-        loadMockData();
-
-        currentUser = {
-            _id: 'mockuser123',
-            name: 'Admin User',
-            email: 'admin@test.com',
-            role: 'Admin',
-            status: 'Active'
-        };
-
-        document.getElementById('currentUserDisplay').innerHTML = `
-            <p class="mb-1 text-white small"><b>${currentUser.name}</b></p>
-            <p class="mb-2 text-white-50 small">${currentUser.role}</p>
-        `;
-
-        updateUIForRole(currentUser.role);
-        renderAll();
-
-        const defaultPage = 'dashboard';
-        showPage(defaultPage);
-        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-        document.querySelector(`.nav-link[data-page="${defaultPage}"]`).classList.add('active');
+    async function init() {
+        const token = localStorage.getItem('authToken');
+        
+        if (token) {
+            // Token exists, try to fetch user data to validate it
+            const user = await apiCall('/auth/me'); 
+            
+            if (user) {
+                // Token is valid, log the user in automatically
+                currentUser = user;
+                
+                document.getElementById('currentUserDisplay').innerHTML = `
+                    <p class="mb-1 text-white small"><b>${currentUser.name}</b></p>
+                    <p class="mb-2 text-white-50 small">${currentUser.role}</p>
+                `;
+                
+                updateUIForRole(currentUser.role);
+                await fetchAllData();
+                
+                const defaultPage = (currentUser.role === 'Employee') ? 'time-clock' : 'dashboard';
+                showPage(defaultPage);
+                document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                document.querySelector(`.nav-link[data-page="${defaultPage}"]`).classList.add('active');
+            } else {
+                // Token was invalid or expired, clear it and show login
+                handleLogout();
+            }
+        } else {
+            // No token, show the login screen
+            showPage(null);
+        }
     }
 
     init();
 });
-
-
-
-
 
