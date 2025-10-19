@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', function () {
     // --- API & GLOBAL STATE ---
     // IMPORTANT: Replace this with your actual Render backend URL
-    const API_URL = 'https://quantum-erp-api.onrender.com/api'; 
+    const API_URL = 'https://quantum-erp-backend-api.onrender.com/api'; 
     let currentUser = null;
     let users = [];
     let inventory = [];
@@ -1421,4 +1421,5 @@ document.addEventListener('DOMContentLoaded', function () {
 
     init();
 });
+
 
