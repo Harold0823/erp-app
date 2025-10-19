@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', function () {
     // --- API & GLOBAL STATE ---
-    // This now points to your live Render backend
+    // IMPORTANT: Replace this with your actual Render backend URL
     const API_URL = 'https://quantum-erp-backend-api.onrender.com/api'; 
     let currentUser = null;
     let users = [];
@@ -41,7 +41,16 @@ document.addEventListener('DOMContentLoaded', function () {
             showPage(pageId);
             
             navLinks.forEach(l => l.classList.remove('active'));
+             // This handles nested links in the dropdown
+            if (this.classList.contains('sub-link')) {
+                const parentCollapse = this.closest('.collapse');
+                if(parentCollapse) {
+                    const dropdownToggle = document.querySelector(`[data-bs-target="#${parentCollapse.id}"]`);
+                    if(dropdownToggle) dropdownToggle.classList.add('active');
+                }
+            }
             this.classList.add('active');
+
 
             if (window.innerWidth < 992) {
                 sidebar.classList.remove('active');
@@ -81,8 +90,15 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             
             if (pageId === 'live-location') {
-                if (!map) initMap();
-                renderAllActivePins();
+                // Defer map initialization to ensure container is visible
+                setTimeout(() => {
+                    if (!map || !map.getCenter()) {
+                        initMap();
+                    } else {
+                        map.invalidateSize();
+                        renderAllActivePins();
+                    }
+                }, 10);
             }
             if (pageId === 'time-clock' && currentUser && currentUser.role === 'Employee') {
                 renderEmployeeSalesReportForm();
@@ -102,6 +118,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     
     function updateDashboard() {
+        if (!document.getElementById('dashboard').classList.contains('active')) return;
         document.getElementById('total-revenue').textContent = `$${orders.reduce((sum, o) => sum + o.total, 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
         document.getElementById('total-orders').textContent = orders.length;
         document.getElementById('active-users').textContent = users.filter(u => u.status === 'Active').length;
@@ -114,6 +131,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function renderSalesOverviewCharts() {
         const dailySalesContainer = document.getElementById('daily-sales-chart-container');
+        if (!dailySalesContainer) return;
         const todayStr = new Date().toISOString().split('T')[0];
         const todaysSales = orders
             .filter(order => new Date(order.date).toISOString().startsWith(todayStr))
@@ -165,8 +183,9 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function renderSellersOverview() {
-        const today = new Date().toISOString().split('T')[0];
         const dailyList = document.getElementById('daily-sellers-list');
+        if (!dailyList) return;
+        const today = new Date().toISOString().split('T')[0];
         const todaysLogs = timeClockLogs.filter(log => new Date(log.timestamp).toISOString().startsWith(today) && log.action === 'clock-in');
         
         const uniqueDailyUsers = {};
@@ -230,6 +249,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function renderDashboardCharts() {
         const salesContainer = document.getElementById('salesChartContainer');
+        if (!salesContainer) return;
         salesContainer.innerHTML = '';
         const salesData = {};
         const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -343,6 +363,9 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function renderDeploymentCharts() {
+        const dailyChartContainer = document.getElementById('daily-deployment-chart');
+        if (!dailyChartContainer) return;
+
         const today = new Date();
         const todayStr = today.toISOString().split('T')[0];
         
@@ -353,7 +376,6 @@ document.addEventListener('DOMContentLoaded', function () {
         ).size;
         
         const dailyPercentage = dailyDeploymentTarget > 0 ? Math.min(100, (dailyPresent / dailyDeploymentTarget) * 100) : 0;
-        const dailyChartContainer = document.getElementById('daily-deployment-chart');
         dailyChartContainer.innerHTML = createPieChartHTML('daily', dailyPercentage, `${dailyPresent} / ${dailyDeploymentTarget}`);
 
         const currentMonth = today.getMonth();
@@ -490,6 +512,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function renderUserTable() {
         const tbody = document.getElementById('user-table-body');
+        if (!tbody) return;
         if (users.length === 0) {
             tbody.innerHTML = `<tr><td colspan="5" class="text-center p-4">No users found. Add a user to get started.</td></tr>`;
             return;
@@ -511,6 +534,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // Employee Profiles
     function renderEmployeeProfiles() {
         const container = document.getElementById('employee-profile-list');
+        if (!container) return;
         const employees = users.filter(u => u.role === 'Employee');
         if(employees.length === 0) {
              container.innerHTML = `<div class="col-12"><p class="text-center text-muted">No employees found.</p></div>`;
@@ -552,6 +576,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function renderInventoryTable() {
         const tbody = document.getElementById('inventory-table-body');
+        if (!tbody) return;
         if (inventory.length === 0) {
              tbody.innerHTML = `<tr><td colspan="6" class="text-center p-4">No inventory items found.</td></tr>`;
              return;
@@ -596,6 +621,7 @@ document.addEventListener('DOMContentLoaded', function () {
     
     function renderOrderTable() {
         const tbody = document.getElementById('order-table-body');
+        if (!tbody) return;
          if (orders.length === 0) {
              tbody.innerHTML = `<tr><td colspan="7" class="text-center p-4">No orders found.</td></tr>`;
              return;
@@ -633,6 +659,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // Sales Reports
     function renderSalesReportsTable() {
         const tbody = document.getElementById('sales-reports-table-body');
+        if (!tbody) return;
         if (salesReports.length === 0) {
             tbody.innerHTML = `<tr><td colspan="6" class="text-center p-4">No sales reports submitted.</td></tr>`;
             return;
@@ -696,6 +723,7 @@ document.addEventListener('DOMContentLoaded', function () {
     
     function renderProjectTable() {
         const tbody = document.getElementById('project-table-body');
+        if (!tbody) return;
         if (projects.length === 0) {
              tbody.innerHTML = `<tr><td colspan="6" class="text-center p-4">No projects found.</td></tr>`;
              return;
@@ -723,6 +751,7 @@ document.addEventListener('DOMContentLoaded', function () {
          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
              attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
          }).addTo(map);
+         renderAllActivePins();
     }
 
     async function reverseGeocode(lat, lng) {
@@ -831,7 +860,9 @@ document.addEventListener('DOMContentLoaded', function () {
         if (liveLocationInterval) {
             clearInterval(liveLocationInterval);
             liveLocationInterval = null;
-            removeLocationFromMap(currentUser);
+            if(currentUser) {
+                removeLocationFromMap(currentUser);
+            }
         }
     }
 
@@ -988,6 +1019,7 @@ document.addEventListener('DOMContentLoaded', function () {
     
     function renderAdminActivityLog() {
         const tbody = document.getElementById('admin-activity-log-body');
+        if (!tbody) return;
         if (timeClockLogs.length === 0) {
              tbody.innerHTML = `<tr><td colspan="5" class="text-center p-4">No activity logs found.</td></tr>`;
              return;
@@ -1076,6 +1108,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function renderEmployeeSalesReportForm() {
         if (!currentUser || currentUser.role !== 'Employee') return;
         const reportForm = document.getElementById('salesReportForm');
+        if(!reportForm) return;
         const todayStr = new Date().toISOString().split('T')[0];
         const existingReport = salesReports.find(r => r.userId === currentUser._id && r.date === todayStr);
 
@@ -1466,4 +1499,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     init();
 });
+" in the most up-to-date Canvas "QuantumERP Application Logic" document and am asking a question about it.
+fix the error
 
