@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', function () {
     // --- API & GLOBAL STATE ---
     // Direct URL for local development. This should be changed for production.
-const API_URL = 'http://localhost:5000/api';'; 
+const API_URL = 'http://localhost:5000/api';
     let currentUser = null;
     let users = [];
     let inventory = [];
@@ -1401,24 +1401,36 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
         ];
     }
 
-    async function fetchAllData() {
-        // In a real app, this would fetch data from the server.
-        // In this mock version, it does nothing because data is loaded in init().
-        console.log("Mock environment: fetchAllData is intentionally empty.");
-    }
+    // Replace the mock fetchAllData function with this:
+async function fetchAllData() {
+    const [usersData, inventoryData, ordersData, projectsData, logsData, salesData] = await Promise.all([
+        apiCall('/users'),
+        apiCall('/inventory'),
+        apiCall('/orders'),
+        apiCall('/projects'),
+        apiCall('/time-clock-logs'),
+        apiCall('/sales-reports'),
+    ]);
+    users = usersData || [];
+    inventory = inventoryData || [];
+    orders = ordersData || [];
+    projects = projectsData || [];
+    timeClockLogs = logsData || [];
+    salesReports = salesData || [];
 
-    function renderAll() {
-        if (!currentUser) return; // Don't render if not logged in
-        updateDashboard();
-        renderUserTable();
-        renderInventoryTable();
-        renderOrderTable();
-        renderEmployeeProfiles();
-        renderProjectTable();
-        renderUserActivityLog();
-        renderAdminActivityLog();
-        renderSalesReportsTable();
-    }
+    renderAll();
+}    function renderAll() {
+    if (!currentUser) return; // Don't render if not logged in
+    updateDashboard();
+    renderUserTable();
+    renderInventoryTable();
+    renderOrderTable();
+    renderEmployeeProfiles();
+    renderProjectTable();
+    renderUserActivityLog();
+    renderAdminActivityLog();
+    renderSalesReportsTable();
+}
 
     function init() {
         // --- MOCK AUTO-LOGIN ---
@@ -1448,6 +1460,7 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
 
     init();
 });
+
 
 
 
