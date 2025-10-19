@@ -1083,34 +1083,47 @@ const API_URL = 'http://localhost:5000/api';';
 
     // --- EVENT LISTENERS ---
     // Login
-    document.getElementById('login-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const loginError = document.getElementById('login-error');
-        loginError.textContent = '';
-    
-        // --- MOCK LOGIN ---
-        currentUser = {
-            _id: 'mockuser123',
-            name: 'Admin User',
-            email: 'admin@test.com',
-            role: 'Admin',
-            status: 'Active'
-        };
-    
+    // Replace the mock login event listener with this:
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    const loginError = document.getElementById('login-error');
+    loginError.textContent = '';
+
+    try {
+        const data = await apiCall('/auth/login', 'POST', { email, password });
+
+        if (!data || !data.user || !data.token) {
+            // This will trigger if the apiCall function returns null or an invalid response
+            if (!loginError.textContent) {
+                loginError.textContent = "Login failed. Please check your credentials.";
+            }
+            return;
+        }
+
+        const { user, token } = data;
+
+        currentUser = user;
+        localStorage.setItem('authToken', token);
+
         document.getElementById('currentUserDisplay').innerHTML = `
             <p class="mb-1 text-white small"><b>${currentUser.name}</b></p>
             <p class="mb-2 text-white-50 small">${currentUser.role}</p>
         `;
-    
+
         updateUIForRole(currentUser.role);
-        fetchAllData(); 
-    
-        const defaultPage = 'dashboard';
+        await fetchAllData();
+
+        const defaultPage = (currentUser.role === 'Employee') ? 'time-clock' : 'dashboard';
         showPage(defaultPage);
         document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
         document.querySelector(`.nav-link[data-page="${defaultPage}"]`).classList.add('active');
-    });
-
+    } catch (error) {
+        loginError.textContent = error.message;
+    }
+});
+    
     function handleLogout() {
         currentUser = null;
         localStorage.removeItem('authToken');
@@ -1435,6 +1448,6 @@ const API_URL = 'http://localhost:5000/api';';
 
     init();
 });
-" in the canvas, and I'm asking a question about it. Please fix the error.
+
 
 
