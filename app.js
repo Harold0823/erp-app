@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', function () {
     // --- API & GLOBAL STATE ---
     // Direct URL for local development. This should be changed for production.
-const API_URL = 'http://localhost:5000/api';
+const API_URL = ' https://harold0823.github.io/erp-app/api';
     let currentUser = null;
     let users = [];
     let inventory = [];
@@ -1460,6 +1460,7 @@ async function fetchAllData() {
 
     init();
 });
+
 
 
 
