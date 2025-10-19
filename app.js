@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', function () {
     // --- API & GLOBAL STATE ---
-    // IMPORTANT: Replace this with your actual Render backend URL
+    // This now points to your live Render backend
     const API_URL = 'https://quantum-erp-backend-api.onrender.com/api'; 
     let currentUser = null;
     let users = [];
@@ -75,7 +75,10 @@ document.addEventListener('DOMContentLoaded', function () {
         const activePage = document.getElementById(pageId);
         if (activePage) {
             activePage.classList.add('active');
-            pageTitle.textContent = document.querySelector(`.nav-link[data-page="${pageId}"]`).textContent.trim();
+            const pageLink = document.querySelector(`.nav-link[data-page="${pageId}"]`);
+            if (pageLink) {
+                pageTitle.textContent = pageLink.textContent.trim();
+            }
             
             if (pageId === 'live-location') {
                 if (!map) initMap();
@@ -169,10 +172,13 @@ document.addEventListener('DOMContentLoaded', function () {
         const uniqueDailyUsers = {};
         todaysLogs.forEach(log => {
             if (!uniqueDailyUsers[log.userId]) {
-                uniqueDailyUsers[log.userId] = {
-                    name: log.userName,
-                    time: new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                };
+                const user = users.find(u => u._id === log.userId);
+                if (user) {
+                    uniqueDailyUsers[log.userId] = {
+                        name: user.name,
+                        time: new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    };
+                }
             }
         });
 
@@ -436,7 +442,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 } else {
                     const errorText = await response.text();
                     console.error("Non-JSON error response from server:", errorText);
-                    throw new Error(`Login failed. The server sent an unexpected response.`);
+                    throw new Error(`The server sent an unexpected response.`);
                 }
             }
             
@@ -732,7 +738,7 @@ document.addEventListener('DOMContentLoaded', function () {
     
     function updateLocationOnMap(user, lat, lng, logDetails) {
         if (!map) return;
-        const iconUrl = 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><path fill="%234f46e5" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>');
+        const iconUrl = 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><path fill="%234f46e5" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>');
         
         const customIcon = L.icon({
             iconUrl: iconUrl,
@@ -1116,17 +1122,16 @@ document.addEventListener('DOMContentLoaded', function () {
         };
 
         if (existingReport) {
-            salesReports = salesReports.map(r => r._id === existingReport._id ? {...r, ...reportData} : r);
+            await apiCall(`/sales-reports/${existingReport._id}`, 'PUT', reportData);
         } else {
-            reportData._id = `sr${Date.now()}`;
-            salesReports.push(reportData);
+            await apiCall('/sales-reports', 'POST', reportData);
         }
         
         const feedback = document.getElementById('report-feedback');
         feedback.textContent = `Report updated successfully at ${new Date().toLocaleTimeString()}.`;
         setTimeout(() => feedback.textContent = '', 3000);
         
-        renderAll();
+        await fetchAllData();
     }
 
     // --- EVENT LISTENERS ---
@@ -1419,7 +1424,46 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    // --- LOGIN FORM SUBMISSION ---
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        const loginError = document.getElementById('login-error');
+        loginError.textContent = '';
+    
+        try {
+            const data = await apiCall('/auth/login', 'POST', { email, password });
+    
+            if (!data || !data.user || !data.token) {
+                if (!loginError.textContent) {
+                    loginError.textContent = "Login failed. Please check your credentials.";
+                }
+                return;
+            }
+    
+            const { user, token } = data;
+    
+            currentUser = user;
+            localStorage.setItem('authToken', token);
+    
+            document.getElementById('currentUserDisplay').innerHTML = `
+                <p class="mb-1 text-white small"><b>${currentUser.name}</b></p>
+                <p class="mb-2 text-white-50 small">${currentUser.role}</p>
+            `;
+    
+            updateUIForRole(currentUser.role);
+            await fetchAllData();
+    
+            const defaultPage = (currentUser.role === 'Employee') ? 'time-clock' : 'dashboard';
+            showPage(defaultPage);
+            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+            document.querySelector(`.nav-link[data-page="${defaultPage}"]`).classList.add('active');
+        } catch (error) {
+            loginError.textContent = error.message;
+        }
+    });
+
     init();
 });
-
 
